@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sudoku Annotator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <link rel="icon" type="image/png" href="pug-sudoku-icon.png" />
+  <link rel="apple-touch-icon" href="pug-sudoku-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1 class="app-title">
+        <span class="label-long">Sudoku Annotator</span>
+        <span class="label-short">Sudoku</span>
+      </h1>
+      <div class="header-meta">
+        <div class="mode-badge" id="mode-label">Setup mode</div>
+        <div class="timer-controls" aria-label="Timer">
+          <span id="timer-elapsed" class="timer-elapsed" aria-live="polite">00:00</span>
+          <button id="timer-toggle-button" class="secondary timer-toggle" disabled aria-label="Pause or resume timer">Pause</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="board-section">
+        <div id="completion-banner" class="completion-banner" hidden role="status" aria-live="polite">
+          <div class="completion-banner-inner">
+            <p class="completion-title">Puzzle solved!</p>
+            <p class="completion-subtitle">Every row, column, and 3×3 box is complete.</p>
+            <p class="completion-time">Time: <span id="completion-time">00:00</span></p>
+          </div>
+        </div>
+        <div id="sudoku-board" class="board" aria-label="Sudoku board" role="grid"></div>
+      </section>
+
+      <section class="controls-section">
+        <div class="setup-controls">
+          <button id="lock-button" class="primary">
+            <span class="label-long">Start / Lock puzzle</span>
+            <span class="label-short">Lock</span>
+          </button>
+          <button id="clear-board-button" class="secondary">
+            <span class="label-long">Clear board</span>
+            <span class="label-short">Clear</span>
+          </button>
+        </div>
+
+        <div class="mode-switcher" aria-label="Entry mode">
+          <button class="mode-button active" data-mode="answer" id="mode-answer">
+            <span class="label-long">Answer (A)</span>
+            <span class="label-short">Answer</span>
+          </button>
+          <button class="mode-button" data-mode="edge" id="mode-edge">
+            <span class="label-long">Edge notes (E)</span>
+            <span class="label-short">Edge</span>
+          </button>
+          <button class="mode-button" data-mode="middle" id="mode-middle">
+            <span class="label-long">Middle notes (M)</span>
+            <span class="label-short">Middle</span>
+          </button>
+        </div>
+
+        <div class="history-controls">
+          <button id="undo-button" class="secondary">
+            <span class="label-long">Undo (Ctrl+Z)</span>
+            <span class="label-short">Undo</span>
+          </button>
+          <button id="redo-button" class="secondary">
+            <span class="label-long">Redo (Ctrl+Y)</span>
+            <span class="label-short">Redo</span>
+          </button>
+        </div>
+
+        <div class="number-pad" aria-label="Number pad">
+          <div class="number-pad-grid">
+            <button class="pad-key" data-digit="1">1</button>
+            <button class="pad-key" data-digit="2">2</button>
+            <button class="pad-key" data-digit="3">3</button>
+            <button class="pad-key" data-digit="4">4</button>
+            <button class="pad-key" data-digit="5">5</button>
+            <button class="pad-key" data-digit="6">6</button>
+            <button class="pad-key" data-digit="7">7</button>
+            <button class="pad-key" data-digit="8">8</button>
+            <button class="pad-key" data-digit="9">9</button>
+            <button id="clear-cell-button" class="pad-key pad-key-clear" aria-label="Clear cell">⌫</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <canvas id="confetti-canvas" class="confetti-canvas" aria-hidden="true"></canvas>
+
+  <script src="app.js"></script>
+</body>
+</html>
