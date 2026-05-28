@@ -3,6 +3,11 @@
 
   const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
   const STORAGE_KEY = "sudoku-annotator:v1";
+  /**
+   * Single query param (`query` preferred, `board` alias): 9 rows (`;`),
+   * 9 cells per row (`,`), empty cells blank. Read from raw search so `;` works unencoded.
+   */
+  const BOARD_QUERY_KEYS = ["query", "board"];
 
   const boardEl = document.getElementById("sudoku-board");
   const modeLabelEl = document.getElementById("mode-label");
@@ -24,7 +29,7 @@
   let confettiParticles = /** @type {Array<{x:number,y:number,vx:number,vy:number,size:number,rotation:number,vr:number,alpha:number,decay:number}>} */ ([]);
 
   const modeButtons = Array.from(document.querySelectorAll(".mode-button"));
-  const padKeyEls = Array.from(document.querySelectorAll(".pad-key"));
+  const padKeyEls = Array.from(document.querySelectorAll(".pad-key[data-digit]"));
 
   const dom = {
     cells: /** @type {Array<{el: HTMLElement, answerEl: HTMLElement, edgeEls: HTMLElement[], middleEl: HTMLElement}>} */ (
@@ -598,6 +603,8 @@
   }
 
   function applyDigitToSelected(d) {
+    if (!Number.isInteger(d) || d < 1 || d > 9) return;
+
     const idx = state.ui.selectedIndex;
     if (idx == null) return;
     if (!canEditCell(idx)) return;
@@ -696,6 +703,146 @@
     render();
     resetTimer();
     clearStorage();
+  }
+
+  function isBoardBlank() {
+    for (const cell of state.cells) {
+      if (cell.value != null) return false;
+      if (cell.edgeNotes.length > 0 || cell.middleNotes.length > 0) return false;
+    }
+    return true;
+  }
+
+  function getBoardQueryRaw() {
+    const search = window.location.search;
+    if (!search || search.length < 2) return null;
+
+    for (const key of BOARD_QUERY_KEYS) {
+      const match = search.match(new RegExp(`[?&]${key}=`, "i"));
+      if (!match || match.index === undefined) continue;
+      return search.slice(match.index + match[0].length);
+    }
+    return null;
+  }
+
+  function stripBoardQueryFromUrl() {
+    const search = window.location.search;
+    if (!search) return;
+
+    const hasBoardParam = BOARD_QUERY_KEYS.some((key) => search.includes(`${key}=`));
+    if (!hasBoardParam) return;
+
+    const url = new URL(window.location.href);
+    window.history.replaceState({}, "", url.pathname + url.hash);
+  }
+
+  function normalizeRowCells(cells) {
+    const row = cells.map((c) => c.trim());
+    while (row.length > 9 && row[row.length - 1] === "") {
+      row.pop();
+    }
+    while (row.length < 9) {
+      row.push("");
+    }
+    if (row.length !== 9) return null;
+    return row;
+  }
+
+  function parseBoardQueryParam(raw) {
+    if (raw == null || raw.trim() === "") {
+      return { ok: false, error: "empty" };
+    }
+
+    let decoded = raw.trim();
+    try {
+      decoded = decodeURIComponent(decoded.replace(/\+/g, " "));
+    } catch {
+      return { ok: false, error: "encoding" };
+    }
+
+    const rows = decoded.split(";").map((r) => r.trim());
+    if (rows.length !== 9) {
+      return { ok: false, error: "rows", detail: `Found ${rows.length} rows, expected 9.` };
+    }
+
+    const values = /** @type {Array<number|null>} */ ([]);
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const splitCells = rows[rowIndex].split(",");
+      const cells = normalizeRowCells(splitCells);
+      if (cells == null) {
+        return {
+          ok: false,
+          error: "cells",
+          detail: `Row ${rowIndex + 1} has ${splitCells.length} cells (expected 9).`,
+        };
+      }
+      for (const token of cells) {
+        if (token === "") {
+          values.push(null);
+          continue;
+        }
+        const d = Number(token);
+        if (!Number.isInteger(d) || d < 1 || d > 9) {
+          return { ok: false, error: "digit", detail: `Row ${rowIndex + 1} has invalid value "${token}".` };
+        }
+        values.push(d);
+      }
+    }
+
+    if (values.length !== 81) {
+      return { ok: false, error: "count" };
+    }
+
+    return { ok: true, values };
+  }
+
+  function applyImportedBoard(values) {
+    state.history.past = [];
+    state.history.future = [];
+    state.ui = { mode: "setup", selectedIndex: null, activeDigit: null };
+    wasPuzzleSolved = false;
+    stopPugConfetti();
+    resetTimer();
+
+    state.cells = values.map((v) => {
+      if (v == null) return emptyCell();
+      return { given: false, value: v, edgeNotes: [], middleNotes: [] };
+    });
+
+    saveToStorage();
+  }
+
+  function handleBoardQueryParam() {
+    const raw = getBoardQueryRaw();
+    if (raw == null) return;
+
+    const parsed = parseBoardQueryParam(raw);
+
+    const finish = () => stripBoardQueryFromUrl();
+
+    if (!parsed.ok) {
+      finish();
+      if (raw.trim() !== "") {
+        const detail = parsed.detail ? `\n\n${parsed.detail}` : "";
+        window.alert(
+          `Could not load board from link. Use ?query= with 9 rows separated by ; and 9 cells per row separated by , (empty cells blank).${detail}`
+        );
+      }
+      return;
+    }
+
+    if (!isBoardBlank()) {
+      const ok = window.confirm(
+        "Load puzzle from this link? Your current board will be replaced with the imported setup."
+      );
+      if (!ok) {
+        finish();
+        return;
+      }
+    }
+
+    applyImportedBoard(parsed.values);
+    finish();
   }
 
   function unlockPuzzle() {
@@ -797,7 +944,9 @@
       );
 
       if (cell.given && state.ui.mode !== "setup") cellDom.el.classList.add("given");
-      if (state.ui.selectedIndex === i) cellDom.el.classList.add("isSelected");
+      const isCellSelected = state.ui.selectedIndex === i;
+      if (isCellSelected) cellDom.el.classList.add("isSelected");
+      cellDom.el.setAttribute("aria-selected", isCellSelected ? "true" : "false");
 
       if (state.ui.selectedIndex != null) {
         const { row: selR, col: selC } = indexToRowCol(state.ui.selectedIndex);
@@ -886,9 +1035,7 @@
       el.appendChild(edgeWrapEl);
       el.appendChild(middleEl);
 
-      el.addEventListener("click", () => selectIndex(i));
-      el.addEventListener("pointerdown", (e) => {
-        // Ensure selection happens before keyboard.
+      el.addEventListener("click", (e) => {
         e.preventDefault();
         selectIndex(i);
       });
@@ -1016,6 +1163,7 @@
     state.ui = { mode: "setup", selectedIndex: null, activeDigit: null };
     state.timer = { elapsedMs: 0, running: false, startedAtMs: null };
     loadFromStorage();
+    handleBoardQueryParam();
     ensureTimerInterval();
 
     // Number pad input.
@@ -1027,7 +1175,10 @@
       });
     }
 
-    clearCellButtonEl.addEventListener("click", () => clearSelectionInMode());
+    clearCellButtonEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearSelectionInMode();
+    });
     undoButtonEl.addEventListener("click", undo);
     redoButtonEl.addEventListener("click", redo);
     clearBoardButtonEl.addEventListener("click", clearBoard);

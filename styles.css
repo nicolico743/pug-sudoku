@@ -206,6 +206,8 @@ body {
   cursor: pointer;
   user-select: none;
   outline: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .cell:focus-visible {
@@ -227,10 +229,6 @@ body {
 }
 
 /* Highlight states */
-.isSelected {
-  background: var(--selected);
-}
-
 .inActiveRow,
 .inActiveCol {
   background: var(--highlight-rowcol);
@@ -238,6 +236,18 @@ body {
 
 .inActiveBox {
   background: var(--highlight-box);
+}
+
+/* Selected cell must win over row/col/box backgrounds (especially on touch devices). */
+.cell.isSelected {
+  background: var(--selected);
+  box-shadow: inset 0 0 0 2.5px rgba(37, 99, 235, 0.85);
+}
+
+.cell.isSelected.inActiveRow,
+.cell.isSelected.inActiveCol,
+.cell.isSelected.inActiveBox {
+  background: var(--selected);
 }
 
 /* Same formal answer overlay (does not override row/col highlights). */
